@@ -50,16 +50,18 @@ def train(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="../llama3-8B-Instruct-HF")
+    parser.add_argument("--model", type=str, default="/work/frink/models/llama3-8B-Instruct-HF")
     parser.add_argument("--output_dir", type=str, default="./model/result_model")
-    parser.add_argument("--input_dir", type=str, default="./processed_data")
+    parser.add_argument("--input_dir", type=str, default="./processed_data_v1.2")
 
     parser.add_argument("--devices", type=list, default=[0])
 
     parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--accumulate_grad_batches", type=int, default=1)
     parser.add_argument("--lr", type=float, default=5e-4)
-    parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument("--epochs", type=int, default=50)
+    
+    parser.add_argument("--eval_set", type=float, default=0.05)
 
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--shuffle", type=bool, default=True)

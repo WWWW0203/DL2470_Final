@@ -3,10 +3,14 @@ from pytorch_lightning import seed_everything
 from datasets import Dataset, load_dataset
 from pytorch_lightning.utilities.types import TRAIN_DATALOADERS
 from pytorch_lightning.utilities.data import DataLoader
+from transformers import RobertaForSequenceClassification, LlamaForCausalLM
 import torch
 import random
 import os
 import copy
+from torchmetrics.text.rouge import ROUGEScore
+from torchmetrics.text.bert import BERTScore
+
 
 IGNORE_INDEX = -100
 TITLE = "The Chronicles of Eldoria: The Forgotten Kingdom"
@@ -18,11 +22,19 @@ class StatusDataModule(pl.LightningDataModule):
     def __init__(self, args, tokenizer) -> None:
         super(StatusDataModule, self).__init__()
         
-        self.dataset = Dataset.load_from_disk(os.path.join(args.input_dir, "result_status"))
+        dataset = Dataset.load_from_disk(os.path.join(args.input_dir, "result_status"))
+        
+        if args.eval_set != 0:
+            self.train_set = dataset.train_test_split(test_size=args.eval_set, seed=args.seed)["train"]
+            self.eval_set = dataset.train_test_split(test_size=args.eval_set, seed=args.seed)["test"]
+        else:
+            self.train_set = dataset
+            self.eval_set = None
+            
         self.seed = args.seed
         
         if args.shuffle:
-            self.dataset = self.dataset.shuffle(seed=self.seed)
+            self.train_set = self.train_set.shuffle(seed=self.seed)
 
         self.batch_size = args.batch_size
         self.tokenizer = tokenizer    
@@ -51,9 +63,10 @@ class StatusDataModule(pl.LightningDataModule):
         return batch
 
     def train_dataloader(self) -> TRAIN_DATALOADERS:
-        return DataLoader(self.dataset, batch_size=self.batch_size, collate_fn=self.collate_fn)
+        return DataLoader(self.train_set, batch_size=self.batch_size, collate_fn=self.collate_fn)
     
-    
+    def val_dataloader(self) -> TRAIN_DATALOADERS:
+        return DataLoader(self.eval_set, batch_size=self.batch_size, collate_fn=self.collate_fn)
     
 
 class ResultDataModule(pl.LightningDataModule):
@@ -61,12 +74,19 @@ class ResultDataModule(pl.LightningDataModule):
     def __init__(self, args, tokenizer) -> None:
         super(ResultDataModule, self).__init__()
         
-        self.dataset = Dataset.load_from_disk(os.path.join(args.input_dir, "action_outcome"))
+        dataset = Dataset.load_from_disk(os.path.join(args.input_dir, "action_outcome"))
         self.seed = args.seed
-        
+    
+        if args.eval_set != 0:
+            self.train_set = dataset.train_test_split(test_size=args.eval_set, seed=args.seed)["train"]
+            self.eval_set = dataset.train_test_split(test_size=args.eval_set, seed=args.seed)["test"]
+        else:
+            self.train_set = dataset
+            self.eval_set = None
+            
         if args.shuffle:
-            self.dataset = self.dataset.shuffle(seed=self.seed)
-
+            self.train_set = self.train_set.shuffle(seed=self.seed)
+            
         self.batch_size = args.batch_size
         self.tokenizer = tokenizer
         
@@ -133,7 +153,10 @@ class ResultDataModule(pl.LightningDataModule):
         return batch
 
     def train_dataloader(self) -> TRAIN_DATALOADERS:
-        return DataLoader(self.dataset, batch_size=self.batch_size, collate_fn=self.collate_fn)
+        return DataLoader(self.train_set, batch_size=self.batch_size, collate_fn=self.collate_fn)
+    
+    def val_dataloader(self) -> TRAIN_DATALOADERS:
+        return DataLoader(self.eval_set, batch_size=self.batch_size, collate_fn=self.collate_fn)
     
 
 class ActionDataModule(pl.LightningDataModule):
@@ -141,11 +164,18 @@ class ActionDataModule(pl.LightningDataModule):
     def __init__(self, args, tokenizer) -> None:
         super(ActionDataModule, self).__init__()
         
-        self.dataset = Dataset.load_from_disk(os.path.join(args.input_dir, "outcome_action"))
+        dataset = Dataset.load_from_disk(os.path.join(args.input_dir, "outcome_action"))
         self.seed = args.seed
         
+        if args.eval_set != 0:
+            self.train_set = dataset.train_test_split(test_size=args.eval_set, seed=args.seed)["train"]
+            self.eval_set = dataset.train_test_split(test_size=args.eval_set, seed=args.seed)["test"]
+        else:
+            self.train_set = dataset
+            self.eval_set = None
+            
         if args.shuffle:
-            self.dataset = self.dataset.shuffle(seed=self.seed)
+            self.train_set = self.train_set.shuffle(seed=self.seed)
         
         self.batch_size = args.batch_size
         self.tokenizer = tokenizer
@@ -214,7 +244,10 @@ class ActionDataModule(pl.LightningDataModule):
         return batch
 
     def train_dataloader(self) -> TRAIN_DATALOADERS:
-        return DataLoader(self.dataset, batch_size=self.batch_size, collate_fn=self.collate_fn)
+        return DataLoader(self.train_set, batch_size=self.batch_size, collate_fn=self.collate_fn)
+    
+    def val_dataloader(self) -> TRAIN_DATALOADERS:
+        return DataLoader(self.eval_set, batch_size=self.batch_size, collate_fn=self.collate_fn)
 
 
 class Model(pl.LightningModule):
@@ -225,6 +258,8 @@ class Model(pl.LightningModule):
         self.tokenizer = tokenizer
         self.seed = seed
         self.lr = lr
+        self.rouge = ROUGEScore()
+        self.bertscore = BERTScore()
 
     def save_pretrained(self, path):
         if not os.path.exists(path):
@@ -241,6 +276,35 @@ class Model(pl.LightningModule):
         outputs = self.model(**batch)
         loss = outputs.loss
         self.log("train_loss", loss, prog_bar=True)
+        return loss
+    
+    def validation_step(self, batch, batch_idx):
+        outputs = self.model(**batch)
+        loss = outputs.loss
+        self.log("val_loss", loss, prog_bar=True)
+        
+        if type(self.model) == RobertaForSequenceClassification:
+            logits = outputs.logits
+            preds = torch.argmax(logits, dim=1)
+            labels = batch["labels"]
+            print(batch["input_ids"])
+            acc = (preds == labels).float().mean()
+            self.log("val_acc", acc, prog_bar=True)
+        else:
+            pred = self.model.generate(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"], max_length=1024)
+            pred = pred[:, batch["input_ids"].shape[-1]:]
+            pred = self.tokenizer.batch_decode(pred, skip_special_tokens=True)
+            labels = [[t for t in label if t != -100] for label in batch["labels"]]
+            labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
+            
+            rouge_score = []
+            for p, l in zip(pred, labels):
+                rouge_score.append(self.rouge(p, l)["rouge2_fmeasure"])
+            rouge_score = torch.tensor(rouge_score).mean()
+            # bert_score = self.bertscore(p, l)["f1"][1]
+            self.log("val_rouge2_f1", rouge_score, prog_bar=True)
+            # self.log("val_bert_score_f1", bert_score, prog_bar=True)
+        
         return loss
 
     def configure_optimizers(self):

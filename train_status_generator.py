@@ -19,6 +19,7 @@ def train(args):
     torch.set_float32_matmul_precision("high")
 
     datamodule = StatusDataModule(args, tokenizer)
+    model.train()
     model = Model(model, tokenizer, args.lr, args.seed)
 
     trainer = Trainer(
@@ -38,15 +39,15 @@ def train(args):
         model.save_pretrained(os.path.join(args.output_dir, args.model.split("/")[-1]))
         print("Done")
     elif torch.distributed.get_rank() in [-1, 0]:
-        model.save_pretrained(os.path.join(args.output_dir, args.model.split("/")[-1]))
+        model.save_pretrained(os.path.join(args.output_dir, args.mocddel.split("/")[-1]))
         print("Done")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, default="FacebookAI/xlm-roberta-large")
-    parser.add_argument("--output_dir", type=str, default="./model/status_model")
-    parser.add_argument("--input_dir", type=str, default="./processed_data")
+    parser.add_argument("--output_dir", type=str, default="./debug")
+    parser.add_argument("--input_dir", type=str, default="./processed_data_v1.2")
 
     parser.add_argument("--devices", type=list, default=[0])
 
@@ -54,6 +55,8 @@ if __name__ == "__main__":
     parser.add_argument("--accumulate_grad_batches", type=int, default=1)
     parser.add_argument("--lr", type=float, default=5e-4)
     parser.add_argument("--epochs", type=int, default=50)
+    
+    parser.add_argument("--eval_set", type=float, default=0.05)
 
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--shuffle", type=bool, default=True)

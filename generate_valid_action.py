@@ -18,7 +18,7 @@ def run(prompt, output_dir, uri, num_run, **kwargs):
         print(k+':'+str(v))
 
     openai.organization = ""                        # Don't leak this
-    openai.api_key = ""                             # Don't leak this
+    openai.api_key = ""      # Don't leak this
     
     headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer {}'.format(openai.api_key)}
     

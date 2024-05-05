@@ -3,7 +3,7 @@ import torch
 import pytorch_lightning as pl
 import argparse
 from pytorch_lightning import Trainer, seed_everything
-from modules import ResultDataModule, Model
+from modules import ActionDataModule, Model
 import os
 import json
 from peft import get_peft_model, LoraConfig, TaskType
@@ -21,7 +21,7 @@ def train(args):
 
     torch.set_float32_matmul_precision("high")
 
-    datamodule = ResultDataModule(args, tokenizer)
+    datamodule = ActionDataModule(args, tokenizer)
     model = get_peft_model(model, peft_config)
     model.print_trainable_parameters()
     
@@ -36,7 +36,7 @@ def train(args):
         accumulate_grad_batches=args.accumulate_grad_batches,
         accelerator="gpu",
         log_every_n_steps=10,
-        enable_checkpointing=True,
+        enable_checkpointing=False,
     )
     
     trainer.fit(model, datamodule=datamodule)
@@ -50,19 +50,21 @@ def train(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="../llama3-8B-Instruct-HF")
+    parser.add_argument("--model", type=str, default="/work/frink/models/llama3-8B-Instruct-HF")
     parser.add_argument("--output_dir", type=str, default="./model/action_model")
-    parser.add_argument("--input_dir", type=str, default="./processed_data")
+    parser.add_argument("--input_dir", type=str, default="./processed_data_v1.2")
 
     parser.add_argument("--devices", type=list, default=[0])
 
     parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--accumulate_grad_batches", type=int, default=1)
     parser.add_argument("--lr", type=float, default=5e-4)
-    parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument("--epochs", type=int, default=50)
+    
+    parser.add_argument("--eval_set", type=float, default=0.05)
 
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--shuffle", type=bool, default=True)
+    parser.add_argument("--shuffle", type=bool, default=False)
     
     args = parser.parse_args()
 

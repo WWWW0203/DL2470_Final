@@ -35,7 +35,7 @@ def _get_action_outcome_pairs(cur_dir, cur_situation):
     
     for i, outcome in enumerate(outcomes):
         next_dir = os.path.join(cur_dir, f"scenario_{i+1}")
-        if os.path.exists(next_dir):
+        if os.path.exists(next_dir) and len(os.listdir(next_dir)):
             action_outcome_pairs.extend(_get_action_outcome_pairs(next_dir, outcome["new_situation"]))
         
     return action_outcome_pairs
@@ -59,13 +59,13 @@ def process_outcome_action_pairs(data_dir):
     
     
 if __name__ == "__main__":
-    action_outcome = preprocess_action_outcome_pairs("./data")
+    action_outcome = preprocess_action_outcome_pairs("./data_v1.1")
     outcome_action = process_outcome_action_pairs("./data")
     
     print(len(action_outcome), len(outcome_action))
     if not os.path.exists("processed_data"):
         os.makedirs("processed_data", exist_ok=True)
     
-    action_outcome.save_to_disk("processed_data/action_outcome")
-    outcome_action.save_to_disk("processed_data/outcome_action")
+    action_outcome.save_to_disk("processed_data_v1.1/action_outcome")
+    outcome_action.save_to_disk("processed_data_v1.1/outcome_action")
     

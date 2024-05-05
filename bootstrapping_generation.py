@@ -39,7 +39,7 @@ def step(actions, outcomes, depth, max_depth, save_dir, action_per_scenario):
         
         new_outcomes = []
         for new_action in new_actions:
-            new_outcome = run_outcomes(cur_situation, new_action, uri, **outcome_params)
+            new_outcome = run_outcomes(cur_situation, new_action, uri, allow_end=depth > 4, **outcome_params)
             new_outcomes.append(new_outcome)
         
         json.dump(new_actions, open(os.path.join(new_save_dir, "actions.json"), "w"))
@@ -49,10 +49,8 @@ def step(actions, outcomes, depth, max_depth, save_dir, action_per_scenario):
 
 
 def bootstrap(args):
-    
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir, exist_ok=True)
-    
     initial_actions = json.load(open(args.initial_actions, "r"))
     initial_outcomes = json.load(open(args.initial_outcomes, "r"))
     assert len(initial_actions) == len(initial_outcomes)
@@ -62,11 +60,11 @@ def bootstrap(args):
 
 def main():
     parser = argparse.ArgumentParser(description='Generate valid initial outcomes for a given scenario')
-    parser.add_argument('--actions_per_scenario', type=int, default=2)
+    parser.add_argument('--actions_per_scenario', type=int, default=3)
     parser.add_argument('--max_depth', type=int, default=6)
-    parser.add_argument('--output_dir', type=str, default="data")
-    parser.add_argument('--initial_actions', type=str, default="data/actions.json")
-    parser.add_argument('--initial_outcomes', type=str, default="data/outcomes.json")
+    parser.add_argument('--output_dir', type=str, default="data_v1.1")
+    parser.add_argument('--initial_actions', type=str, default="data_v1.1/actions.json")
+    parser.add_argument('--initial_outcomes', type=str, default="data_v1.1/outcomes.json")
     
     args = parser.parse_args()
     

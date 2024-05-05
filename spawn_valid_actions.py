@@ -4,6 +4,7 @@ import requests
 import openai
 from tqdm import tqdm
 import argparse
+import random
 
 
 TITLE = "The Chronicles of Eldoria: The Forgotten Kingdom"
@@ -53,8 +54,17 @@ def run_actions(cur_situation, uri, num_run, **kwargs):
     ]
     
     while len(results) < num_run:
+        
         msg.append({"role": "system", "content": results[-1]})
-        msg.append({"role": "user", "content": "Come up with another different action."})
+        dice = random.random()
+        if dice < 0.05:
+            msg.append({"role": "user", "content": "Come up with another different action that would let the player win."})
+        elif 0.05 <= dice and dice < 0.3:
+            msg.append({"role": "user", "content": "Come up with another different action that would benefit the player."})
+        elif 0.3 <= dice and dice < 0.5:
+            msg.append({"role": "user", "content": "Come up with another different action that would harm the player."})
+        else:
+            msg.append({"role": "user", "content": "Come up with another different action."})
         
         data = json.dumps(
             {
